@@ -39,8 +39,10 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 MODEL = "THUDM/CogVideoX-5b"
 
-hf_hub_download(repo_id="ai-forever/Real-ESRGAN", filename="RealESRGAN_x4.pth", local_dir="model_real_esran")
-snapshot_download(repo_id="AlexWortega/RIFE", local_dir="model_rife")
+if not os.path.exists("model_real_esran/RealESRGAN_x4.pth"):
+    hf_hub_download(repo_id="ai-forever/Real-ESRGAN", filename="RealESRGAN_x4.pth", local_dir="model_real_esran")
+if not os.path.exists("model_rife/flownet.pkl"):
+    snapshot_download(repo_id="AlexWortega/RIFE", local_dir="model_rife")
 
 pipe = CogVideoXPipeline.from_pretrained(MODEL, torch_dtype=torch.bfloat16).to(device)
 pipe.scheduler = CogVideoXDPMScheduler.from_config(pipe.scheduler.config, timestep_spacing="trailing")
@@ -74,9 +76,6 @@ pipe_image = CogVideoXImageToVideoPipeline.from_pretrained(
 
 os.makedirs("./output", exist_ok=True)
 os.makedirs("./gradio_tmp", exist_ok=True)
-
-upscale_model = utils.load_sd_upscale("model_real_esran/RealESRGAN_x4.pth", device)
-frame_interpolation_model = load_rife_model("model_rife")
 
 sys_prompt = """You are part of a team of bots that creates videos. You work with an assistant bot that will draw anything you say in square brackets.
 
@@ -246,6 +245,8 @@ def infer(
         image_input = Image.fromarray(image_input).resize(size=(720, 480))  # Convert to PIL
         image = load_image(image_input)
         video_pt = pipe_image(
+            width=image.width,
+            height=image.height,
             image=image,
             prompt=prompt,
             num_inference_steps=num_inference_steps,
@@ -438,13 +439,15 @@ with gr.Blocks() as demo:
             video_input,
             video_strength,
             num_inference_steps=50,  # NOT Changed
-            guidance_scale=7.0,  # NOT Changed
+            guidance_scale=6.0,  # NOT Changed
             seed=seed_value,
             progress=progress,
         )
         if scale_status:
+            upscale_model = utils.load_sd_upscale("model_real_esran/RealESRGAN_x4.pth", device)
             latents = utils.upscale_batch_and_concatenate(upscale_model, latents, device)
         if rife_status:
+            frame_interpolation_model = load_rife_model("model_rife")
             latents = rife_inference_with_latents(frame_interpolation_model, latents)
 
         batch_size = latents.shape[0]
