@@ -242,7 +242,7 @@ def infer(
             generator=torch.Generator(device="cpu").manual_seed(seed),
         ).frames
     elif image_input is not None:
-        image_input = Image.fromarray(image_input).resize(size=(720, 480))  # Convert to PIL
+        image_input = Image.fromarray(image_input)  # Convert to PIL
         image = load_image(image_input)
         video_pt = pipe_image(
             width=image.width,
