@@ -11,6 +11,7 @@ import os
 import random
 import threading
 import time
+import argparse
 
 import cv2
 import tempfile
@@ -90,6 +91,42 @@ Other times the user will not want modifications , but instead want a new image 
 Video descriptions must have the same num of words as examples below. Extra words will be ignored.
 """
 
+optimize_item = ["enable_model_cpu_offload","enable_sequential_cpu_offload","enable_slicing","enable_tiling"]
+def do_optimize(pipe,enable_optimize):
+    print("optimize")
+    for key in enable_optimize.keys():
+        if key == optimize_item[0]:
+            print("enable_model_cpu_offload")
+            pipe.enable_model_cpu_offload()
+        if key == optimize_item[1]:
+            print("enable_sequential_cpu_offload")
+            pipe.enable_sequential_cpu_offload()
+        if key == optimize_item[2]:
+            print("enable_slicing")
+            pipe.vae.enable_slicing()
+        if key == optimize_item[3]:
+            print("enable_tiling")
+            pipe.vae.enable_tiling()
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="读取并解析命令行参数")
+
+    # 使用 store_true 使得没有提供该参数时值为 False，提供时值为 True
+    parser.add_argument('--enable_model_cpu_offload', action='store_true',
+                        help="启用 model CPU offload（不提供时为 False）")
+    parser.add_argument('--enable_sequential_cpu_offload', action='store_true',
+                        help="启用 sequential CPU offload（不提供时为 False）")
+    parser.add_argument('--enable_slicing', action='store_true',
+                        help="启用 slicing（不提供时为 False）")
+    parser.add_argument('--enable_tiling', action='store_true',
+                        help="启用 tiling（不提供时为 False）")
+
+    # 解析命令行参数并返回结果
+    args = parser.parse_args()
+
+    # 将 args 转换为字典，并只包含值为 True 的参数
+    args_dict = {key: value for key, value in vars(args).items() if value is True}
+    return args_dict
 
 def resize_if_unfit(input_video, progress=gr.Progress(track_tqdm=True)):
     width, height = get_video_dimensions(input_video)
@@ -481,5 +518,7 @@ with gr.Blocks() as demo:
     video_input.upload(resize_if_unfit, inputs=[video_input], outputs=[video_input])
 
 if __name__ == "__main__":
+    config_dict = parse_args()
+    do_optimize(pipe_image,config_dict)
     demo.queue(max_size=15)
     demo.launch()
